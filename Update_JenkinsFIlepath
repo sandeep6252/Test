@@ -1,0 +1,25 @@
+import jenkins.model.Jenkins
+import org.jenkinsci.plugins.workflow.job.WorkflowJob
+
+def updateJenkinsfilePath(String oldPath, String newPath) {
+    def jenkins = Jenkins.instanceOrNull
+    def updatedPipelines = []
+
+    jenkins.getAllItems(WorkflowJob).each { job ->
+        def scmSource = job.definition?.scm
+        
+        if (scmSource && scmSource.scriptPath == oldPath) {
+            scmSource.scriptPath = newPath
+            job.save()
+            updatedPipelines << job.fullName
+        }
+    }
+
+    println "Updated Jenkinsfile path for ${updatedPipelines.size()} pipelines:"
+    updatedPipelines.each { pipeline ->
+        println "- ${pipeline}"
+    }
+}
+
+// Example usage
+updateJenkinsfilePath('Jenkinsfile', 'ci/Jenkinsfile')
