@@ -1,5 +1,9 @@
 pipeline{
     agent any
+    environment {
+        MAVEN_HOME = 'C:\\Program Files\\apache-maven-3.9.7' // Update this path
+        PATH = "${env.PATH};${MAVEN_HOME}\\bin"
+    }
     stages{
         stage('scm checkout'){
             steps{
@@ -20,10 +24,8 @@ pipeline{
         stage('Build'){
             steps{
                 script{
-                    withEnv(['MYTOOL_HOME=C:\\Program Files\\apache-maven-3.9.7\\bin']) {
-                        sh '$MYTOOL_HOME\\mvn validate'
-                        }
-                    
+                bat 'mvn install'
+   
                 }
             }
         }
