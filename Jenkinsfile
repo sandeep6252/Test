@@ -10,7 +10,7 @@ pipeline{
                 script{
                      checkout([
                         $class: 'GitSCM',
-                        branches: [[name: 'master']], // Replace 'main' with your branch name
+                        branches: [[name: '${Branch}']], // Replace 'main' with your branch name
                         doGenerateSubmoduleConfigurations: false,
                         extensions: [],
                         userRemoteConfigs: [[
