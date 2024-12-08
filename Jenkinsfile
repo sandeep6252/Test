@@ -14,7 +14,7 @@ pipeline{
                         doGenerateSubmoduleConfigurations: false,
                         extensions: [],
                         userRemoteConfigs: [[
-                            url: 'https://github.com/jenkins-docs/simple-java-maven-app.git',
+                            url: 'https://github.com/jenkins-docs/${RepoName}.git',
                             credentialsId: 'DefaultGithub'
                         ]]
                     ])
