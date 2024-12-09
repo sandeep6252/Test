@@ -6,6 +6,7 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'MYCRED', usernameVariable: 'USERNAME', passwordVariable: 'PASS')]) {
                         // Execute the command and capture the output
+                        echo "Running: $udeploycli -username $USERNAME -password <hidden> -weburl https://url-here getApplications"
                         def jsonResponse = sh(
                             script: """
                             $udeploycli -username $USERNAME -password $PASS -weburl https://url-here getApplications
