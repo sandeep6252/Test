@@ -29,6 +29,7 @@ pipeline {
                 }
             }
         }
+
         stage('Append Additional Information') {
             steps {
                 script {
@@ -72,6 +73,7 @@ pipeline {
             }
         }
     }
+
     post {
         always {
             // Archive the updated names file for review
