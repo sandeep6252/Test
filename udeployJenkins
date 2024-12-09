@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+    stages {
+        stage('Retrieve and Process JSON') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'MYCRED', usernameVariable: 'USERNAME', passwordVariable: 'PASS')]) {
+                        // Execute the command and capture the output
+                        def jsonResponse = sh(
+                            script: """
+                            $udeploycli -username $USERNAME -password $PASS -weburl https://url-here getApplications
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        // Parse the JSON response
+                        def jsonSlurper = new groovy.json.JsonSlurper()
+                        def parsedData = jsonSlurper.parseText(jsonResponse)
+
+                        // Extract 'name' values
+                        def names = parsedData.collect { it.name }
+
+                        // Write the extracted names to a file
+                        writeFile file: 'names.txt', text: names.join('\n')
+
+                        // Display the names in the console log
+                        echo "Extracted Names: ${names}"
+                    }
+                }
+            }
+        }
+        stage('Archive Names File') {
+            steps {
+                archiveArtifacts artifacts: 'names.txt', fingerprint: true
+            }
+        }
+    }
+}
