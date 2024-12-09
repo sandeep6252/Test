@@ -1,39 +1,82 @@
 pipeline {
     agent any
+    environment {
+        UDEPLOY_CLI = '/path/to/udeploycli' // Replace with the path to your CLI tool
+        CREDENTIALS_ID = 'MYCRED'          // Replace with your Jenkins credentials ID
+    }
     stages {
-        stage('Retrieve and Process JSON') {
+        stage('Retrieve Application Names') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'MYCRED', usernameVariable: 'USERNAME', passwordVariable: 'PASS')]) {
-                        // Execute the command and capture the output
-                        echo "Running: $udeploycli -username $USERNAME -password <hidden> -weburl https://url-here getApplications"
-                        def jsonResponse = sh(
+                    withCredentials([usernamePassword(credentialsId: "${CREDENTIALS_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASS')]) {
+                        // Execute command to fetch all application names
+                        def appNamesResponse = sh(
                             script: """
-                            $udeploycli -username $USERNAME -password $PASS -weburl https://url-here getApplications
+                            $UDEPLOY_CLI -username $USERNAME -password $PASS -weburl https://url-here getApplications
                             """,
                             returnStdout: true
                         ).trim()
 
-                        // Parse the JSON response
+                        // Parse the JSON response and extract application names
                         def jsonSlurper = new groovy.json.JsonSlurper()
-                        def parsedData = jsonSlurper.parseText(jsonResponse)
+                        def parsedApps = jsonSlurper.parseText(appNamesResponse)
+                        def appNames = parsedApps.collect { it.name }
 
-                        // Extract 'name' values
-                        def names = parsedData.collect { it.name }
-
-                        // Write the extracted names to a file
-                        writeFile file: 'names.txt', text: names.join('\n')
-
-                        // Display the names in the console log
-                        echo "Extracted Names: ${names}"
+                        // Save application names to a file
+                        writeFile file: 'names.txt', text: appNames.join('\n')
+                        echo "Application Names:\n${appNames.join('\n')}"
                     }
                 }
             }
         }
-        stage('Archive Names File') {
+        stage('Append Additional Information') {
             steps {
-                archiveArtifacts artifacts: 'names.txt', fingerprint: true
+                script {
+                    // Read application names from the file
+                    def appNames = readFile('names.txt').readLines()
+                    def updatedContent = []
+
+                    withCredentials([usernamePassword(credentialsId: "${CREDENTIALS_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASS')]) {
+                        // Loop through each application name
+                        for (appName in appNames) {
+                            echo "Processing application: ${appName}"
+
+                            // Fetch additional information for the application
+                            def appDetailsResponse = sh(
+                                script: """
+                                $UDEPLOY_CLI -username $USERNAME -password $PASS -weburl https://url-here getApplicationDetails --appName "${appName}"
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            // Parse the JSON response
+                            def jsonSlurper = new groovy.json.JsonSlurper()
+                            def parsedDetails = jsonSlurper.parseText(appDetailsResponse)
+
+                            // Append the application name
+                            updatedContent << appName
+
+                            // Append names ending with "east-2-dev"
+                            parsedDetails.each { item ->
+                                if (item.name.endsWith("east-2-dev")) {
+                                    updatedContent << "  -> ${item.name}"
+                                }
+                            }
+                        }
+                    }
+
+                    // Write the updated content back to the file
+                    writeFile file: 'names.txt', text: updatedContent.join('\n')
+                    echo "Updated File Content:\n${updatedContent.join('\n')}"
+                }
             }
+        }
+    }
+    post {
+        always {
+            // Archive the updated names file for review
+            archiveArtifacts artifacts: 'names.txt', allowEmptyArchive: true
+            echo "Pipeline completed. Updated file archived."
         }
     }
 }
