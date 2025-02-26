@@ -1,0 +1,57 @@
+import jenkins.model.*
+import hudson.model.*
+import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
+
+def jenkins = Jenkins.instance
+def jobNames = params.JOB_NAMES.tokenize(',')  // Get the input job names from Jenkins parameter
+
+def activeChoiceScript = ''' 
+return ["1.0", "2.0", "3.0"] // Replace this with your actual Active Choice Script
+'''
+
+jobNames.each { jobName ->
+    def job = jenkins.getItemByFullName(jobName.trim())
+    if (job && job instanceof Job) {
+        def paramDefProp = job.getProperty(ParametersDefinitionProperty)
+
+        if (paramDefProp) {
+            def parameters = new ArrayList<>(paramDefProp.getParameterDefinitions()) // Clone list to avoid mutation issues
+            def fortifyAppIndex = parameters.findIndexOf { it.name == "FORTIFY_APP" }
+
+            if (fortifyAppIndex != -1) {  // If FORTIFY_APP exists
+                println "Job '${jobName}' has FORTIFY_APP at index ${fortifyAppIndex}"
+
+                // Check if FORTIFY_VERSION already exists
+                if (parameters.find { it.name == "FORTIFY_VERSION" }) {
+                    println "FORTIFY_VERSION already exists in job '${jobName}', skipping."
+                } else {
+                    // Create the new Active Choice Parameter
+                    def newParam = new org.biouno.unochoice.ChoiceParameter(
+                        "FORTIFY_VERSION",
+                        "Active Choice",
+                        "Select Fortify Version",
+                        new SecureGroovyScript(activeChoiceScript, false, null),
+                        "PT_SINGLE_SELECT",
+                        null
+                    )
+
+                    // Insert the new parameter right after FORTIFY_APP
+                    parameters.add(fortifyAppIndex + 1, newParam)
+
+                    // Apply the updated parameters safely
+                    job.removeProperty(ParametersDefinitionProperty) // Remove old property
+                    job.addProperty(new ParametersDefinitionProperty(parameters)) // Add updated parameters
+                    job.save()
+
+                    println "Added FORTIFY_VERSION parameter to job '${jobName}'"
+                }
+            } else {
+                println "FORTIFY_APP not found in job '${jobName}', skipping."
+            }
+        } else {
+            println "Job '${jobName}' does not have parameters, skipping."
+        }
+    } else {
+        println "Job '${jobName}' not found in Jenkins."
+    }
+}
