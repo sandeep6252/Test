@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+    stages {
+        stage('Update Jobs') {
+            steps {
+                script {
+                    def groovyScript = '''
+                        import jenkins.model.*
+                        import hudson.model.*
+                        import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SecureGroovyScript
+
+                        def jenkins = Jenkins.instance
+                        def jobNames = params.JOB_NAMES.tokenize(',')  // Get the input job names from Jenkins parameter
+
+                        def activeChoiceScript = ''' 
+                            return ["1.0", "2.0", "3.0"] // Replace this with your actual Active Choice Script
+                        '''
+
+                        jobNames.each { jobName ->
+                        def job = jenkins.getItemByFullName(jobName.trim())
+                        if (job && job instanceof Job) {
+                            def paramDefProp = job.getProperty(ParametersDefinitionProperty)
+                            if (paramDefProp) {
+                                def parameters = paramDefProp.getParameterDefinitions()
+                                def fortifyAppIndex = parameters.findIndexOf { it.name == "FORTIFY_APP" }
+                                if (fortifyAppIndex != -1) {            // If FORTIFY_APP exists
+                                    println "Job '${jobName}' has FORTIFY_APP at index ${fortifyAppIndex}"
+                                    // Check if FORTIFY_VERSION already exists
+                                    if (parameters.find { it.name == "FORTIFY_VERSION" }) {
+                                        println "FORTIFY_VERSION already exists in job '${jobName}', skipping."
+                                    } else {
+                                        // Create the new Active Choice Parameter
+                                        def newParam = new choiceParameter(
+                                        "FORTIFY_VERSION",
+                                        "",
+                                        "",
+                                        new GroovyScript(new SecureGroovyScript(scr, false, []), new SecureGroovyScript("return ['Error']", false, [])),
+                                        "PT_SINGLE_SELECT",
+                                        false
+                                        1
+                                        )
+
+                                        // Insert the new parameter at the correct index
+                                        parameters.add(fortifyAppIndex + 1, newParam)
+
+                                        // Save the updated configuration
+                                        job.removeProperty(ParametersDefinitionProperty)
+                                        job.addProperty(new ParametersDefinitionProperty(parameters))
+                                        job.save()
+
+                                        println "Added FORTIFY_VERSION parameter to job '${jobName}'"
+                                    }
+                                } else {
+                                    println "FORTIFY_APP not found in job '${jobName}', skipping."
+                                }
+                            } else {
+                                println "Job '${jobName}' does not have parameters, skipping."
+                            }
+                        } else {
+                            println "Job '${jobName}' not found in Jenkins."
+                        }
+                    }
+
+                    '''
+                    def groovyShell = new GroovyShell(Jenkins.instance.pluginManager.uberClassLoader)
+                    groovyShell.evaluate(groovyScript)
+                }
+            }
+        }
+    }
+}
