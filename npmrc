@@ -1,0 +1,54 @@
+# Standardized NPM Authentication Configuration – DevOps Initiative
+
+## 1. Overview
+
+This document outlines a recent DevOps-led initiative to improve the reliability and consistency of Node.js dependency management in CI/CD pipelines across all CloudBees CI Controllers. A recurring issue due to outdated `.npmrc` configurations was proactively addressed with a centralized and automated solution. This approach ensures secure and consistent access to Nexus Repository Manager, significantly reducing pipeline failures caused by missing or invalid authentication tokens.
+
+---
+
+## 2. Problem Statement
+
+Our development teams use Node.js projects that rely on a `.npmrc` file to authenticate against the Nexus Repository for downloading dependencies. This file contains the registry URL and an authentication token.
+
+Recently, a new authentication token was generated for accessing the Nexus Repository. Although this change was communicated to development teams, several applications were not updated with the new `.npmrc` configuration. As a result, multiple CI/CD pipeline executions failed, leading to delays and inefficiencies in the development lifecycle.
+
+**Key issues:**
+- Manual `.npmrc` management created inconsistency.
+- Reliance on developers to update the file introduced human error.
+- Lack of fallback or automation to handle missing or invalid configurations.
+
+---
+
+## 3. Solution Implemented
+
+To address this issue proactively and prevent future disruptions, the DevOps team implemented the following solution:
+
+### ✅ Automated Fallback via Shared Libraries
+
+- A **standard `.npmrc` file** with valid Nexus credentials was added to the **Configuration File Management** system across all **40 CloudBees CI Controllers**.
+- The **shared library** used in pipeline execution was enhanced with logic to:
+  - Detect if the application is a **Node.js project**.
+  - Check whether a `.npmrc` file exists in the workspace.
+  - If the file is **missing**, automatically inject the centrally managed `.npmrc` file before dependency installation.
+
+This logic ensures:
+- Consistent authentication setup across all pipelines.
+- Zero manual intervention from developers.
+- Fast recovery and immunity against token update failures.
+
+---
+
+## 4. Benefits of the Implementation
+
+- 🔐 **Security**: Authentication tokens are centrally managed and kept up to date.
+- 🛠️ **Reliability**: Node.js builds do not fail due to missing or invalid `.npmrc` files.
+- 👥 **Developer Productivity**: Developers are no longer burdened with maintaining `.npmrc` configurations.
+- 📈 **Scalability**: Works seamlessly across all 40 CloudBees Controllers via shared libraries.
+- 🔁 **Maintainability**: Future token updates require no developer-side action.
+
+---
+
+## 5. Conclusion
+
+This initiative showcases how DevOps can proactively eliminate failure points, enforce best practices, and improve system reliability through automation. By centralizing and automating `.npmrc` file management for Node.js projects, we have removed a key source of pipeline instability. This solution will save significant development and troubleshooting time while aligning with enterprise-grade CI/CD standards.
+
