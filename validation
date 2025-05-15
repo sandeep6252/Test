@@ -1,0 +1,44 @@
+#!/bin/bash
+
+manifestFile="manifest.yml"
+artifactPath="artifact-path-here"
+varFile="varfile-name-here"
+appName="app-name-here"
+
+# Extract 'path:' value from manifest.yml (first occurrence)
+manifestPath=$(grep -E "^[[:space:]]*path[[:space:]]*:" "$manifestFile" | head -n 1 | sed -E 's/^[[:space:]]*path[[:space:]]*:[[:space:]]*//' | tr -d '"' | sed 's|^\./||')
+
+# Normalize empty
+manifestPath="${manifestPath:-}"
+
+# Init command
+cfCmd=""
+
+# Check if path exists
+if [[ -n "$manifestPath" && -e "$manifestPath" ]]; then
+  # Path exists
+  if [[ -f "$manifestPath" ]]; then
+    if [[ "$buildType" == *Vars* ]]; then
+      cfCmd="appbin/install/cf push $appName --vars-file $varFile -f $manifestFile"
+    else
+      cfCmd="appbin/install/cf push $appName -f $manifestFile"
+    fi
+  elif [[ -d "$manifestPath" ]]; then
+    if [[ "$buildType" == *Vars* ]]; then
+      cfCmd="appbin/install/cf push $appName --vars-file $varFile -f $manifestFile -p $artifactPath/$manifestPath"
+    else
+      cfCmd="appbin/install/cf push $appName -f $manifestFile -p $artifactPath"
+    fi
+  fi
+else
+  # Path does not exist or not mentioned
+  if [[ "$buildType" == *Vars* ]]; then
+    cfCmd="appbin/install/cf push $appName --vars-file $varFile -f $manifestFile -p $artifactPath"
+  else
+    cfCmd="appbin/install/cf push $appName -f $manifestFile -p $artifactPath"
+  fi
+fi
+
+# Output & run
+echo "Executing: $cfCmd"
+eval "$cfCmd"
