@@ -39,6 +39,8 @@ else
   fi
 fi
 
-# Output & run
+# Output & run with logging to file, capturing stdout and stderr
 echo "Executing: $cfCmd"
-eval "$cfCmd"
+{
+  eval "$cfCmd"
+} 2>&1 | tee /appbin/install/log/component/devDeployment.log
