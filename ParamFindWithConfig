@@ -1,0 +1,34 @@
+import jenkins.model.*
+import hudson.model.*
+import org.jenkinsci.plugins.workflow.job.WorkflowJob
+import org.biouno.unochoice.DynamicReferenceParameter
+import java.util.logging.Logger
+
+def logger = Logger.getLogger("ActiveChoiceScan")
+def keyword = "8594"
+
+Jenkins.instance.getAllItems(WorkflowJob).each { job ->
+    def configXml = new File(job.rootDir, "config.xml")
+    if (!configXml.exists()) {
+        return
+    }
+
+    def configContent = configXml.text
+    if (!configContent.contains(keyword)) {
+        return
+    }
+
+    def paramProperty = job.getProperty(ParametersDefinitionProperty)
+    if (paramProperty) {
+        def foundParam = paramProperty.parameterDefinitions.find { param ->
+            param instanceof DynamicReferenceParameter && param.name == "FOUND"
+        }
+
+        if (foundParam) {
+            println "Matching Job Found: ${job.absoluteUrl}"
+            println " - Parameter: ${foundParam.name}"
+            println " - Contains keyword '${keyword}'"
+            println "--------------------------------------------"
+        }
+    }
+}
