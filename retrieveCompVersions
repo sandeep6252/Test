@@ -1,0 +1,107 @@
+pipeline {
+    agent any
+
+    environment {
+        JSON_FILE = 'componentVersions.json'
+        CREDENTIAL_ID = 'UDEPLOY_CREDENTIALS'
+        UDEPLOY_HOST = 'your-udeploy-hostname'
+        UDEPLOY_PORT = '8443'
+        DOWNLOAD_DIR = 'downloads'
+    }
+
+    stages {
+        stage('Process Components') {
+            steps {
+                script {
+                    def components = readJSON file: env.JSON_FILE
+                    def results = []
+
+                    withCredentials([usernamePassword(credentialsId: env.CREDENTIAL_ID, usernameVariable: 'UDEPLOY_USER', passwordVariable: 'UDEPLOY_PASS')]) {
+                        components.each { component ->
+                            def compName = component.ComponentName
+                            def version = component.uDeployVersion
+                            def targetDir = "${env.DOWNLOAD_DIR}/${version}"
+
+                            // Create directory
+                            sh "mkdir -p '${targetDir}'"
+
+                            echo "Downloading artifacts for ${compName} version ${version}..."
+
+                            def downloadUrl = "https://${env.UDEPLOY_HOST}:${env.UDEPLOY_PORT}/cli/version/downloadArtifacts"
+                            def downloadCmd = """
+                                curl -k -u ${UDEPLOY_USER}:${UDEPLOY_PASS} \
+                                    --request GET \
+                                    "${downloadUrl}?component=${compName}&version=${version}&location=${targetDir}" \
+                                    --fail
+                            """
+
+                            try {
+                                sh downloadCmd
+                            } catch (err) {
+                                echo "Failed to download artifacts for ${compName} ${version}"
+                                results << [
+                                    component: compName,
+                                    version: version,
+                                    error: "Download Failed"
+                                ]
+                                return
+                            }
+
+                            // Check manifest files
+                            def es1 = fileExists("${targetDir}/manifest-es1.yml")
+                            def es2 = fileExists("${targetDir}/manifest-es2.yml")
+                            def ws2 = fileExists("${targetDir}/manifest-ws2.yml")
+
+                            // Get version properties
+                            def propsUrl = "https://${env.UDEPLOY_HOST}:${env.UDEPLOY_PORT}/cli/version/versionProperties"
+                            def propsOutput = sh(
+                                script: """
+                                    curl -k -u ${UDEPLOY_USER}:${UDEPLOY_PASS} \
+                                        --request GET \
+                                        "${propsUrl}?component=${compName}&version=${version}" \
+                                        --silent
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            def propsJson = readJSON text: propsOutput
+                            def propMap = propsJson.collectEntries { [(it.name): it.value] }
+
+                            results << [
+                                component: compName,
+                                version: version,
+                                files: [
+                                    'manifest-es1.yml': es1 ? 'Available' : 'Not Available',
+                                    'manifest-es2.yml': es2 ? 'Available' : 'Not Available',
+                                    'manifest-ws2.yml': ws2 ? 'Available' : 'Not Available'
+                                ],
+                                props: [
+                                    'ManifestPROD_Es1': propMap['ManifestPROD_Es1'] ?: 'Not Set',
+                                    'ManifestPROD_Es2': propMap['ManifestPROD_Es2'] ?: 'Not Set',
+                                    'mManifestPROD_Ws2': propMap['mManifestPROD_Ws2'] ?: 'Not Set'
+                                ]
+                            ]
+                        }
+                    }
+
+                    // Final Report
+                    echo "================ COMPONENT VALIDATION REPORT ================"
+                    results.each { res ->
+                        echo """
+Component Name: ${res.component}
+Version Name: ${res.version}
+manifest-es1.yml: ${res.files?.get('manifest-es1.yml') ?: 'Not Checked'}
+manifest-es2.yml: ${res.files?.get('manifest-es2.yml') ?: 'Not Checked'}
+manifest-ws2.yml: ${res.files?.get('manifest-ws2.yml') ?: 'Not Checked'}
+
+Version Properties:
+ManifestPROD_Es1: ${res.props?.get('ManifestPROD_Es1') ?: 'Not Found'}
+ManifestPROD_Es2: ${res.props?.get('ManifestPROD_Es2') ?: 'Not Found'}
+mManifestPROD_Ws2: ${res.props?.get('mManifestPROD_Ws2') ?: 'Not Found'}
+"""
+                    }
+                }
+            }
+        }
+    }
+}
