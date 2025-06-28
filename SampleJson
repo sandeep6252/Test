@@ -1,0 +1,10 @@
+[
+  {
+    "ComponentName": "OrderService",
+    "uDeployVersion": "1.0.45-REL"
+  },
+  {
+    "ComponentName": "UserAPI",
+    "uDeployVersion": "1.2.8-HOTFIX"
+  }
+]
