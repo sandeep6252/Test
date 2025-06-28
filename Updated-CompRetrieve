@@ -1,0 +1,144 @@
+script {
+    def components = readJSON file: env.JSON_FILE
+    def results = []
+
+    withCredentials([usernamePassword(credentialsId: env.CREDENTIAL_ID, usernameVariable: 'UDEPLOY_USER', passwordVariable: 'UDEPLOY_PASS')]) {
+        components.each { component ->
+            def compName = component.ComponentName
+            def version = component.uDeployVersion
+            def versionDir = "${env.WORKSPACE_DIR}/${version}"
+            def zipFile = "${versionDir}/artifacts.zip"
+
+            sh "mkdir -p '${versionDir}'"
+            echo "Downloading artifacts ZIP for ${compName} version ${version}..."
+
+            def downloadUrl = "https://${env.UDEPLOY_HOST}:${env.UDEPLOY_PORT}/cli/version/downloadArtifacts"
+            def downloadCmd = """
+                curl -k -u ${UDEPLOY_USER}:${UDEPLOY_PASS} \
+                    --request GET \
+                    "${downloadUrl}?component=${compName}&version=${version}&location=${zipFile}" \
+                    --fail --output "${zipFile}"
+            """
+
+            try {
+                sh downloadCmd
+                sh "unzip -o '${zipFile}' -d '${versionDir}'"
+            } catch (err) {
+                echo "❌ Failed to process ${compName} ${version}"
+                results << [component: compName, version: version, error: "Download/Unzip Failed"]
+                return
+            }
+
+            // Manifest checks
+            def filesToCheck = ["manifest-es1.yml", "manifest-es2.yml", "manifest-ws2.yml"]
+            def fileChecks = [:]
+            filesToCheck.each { f -> fileChecks[f] = fileExists("${versionDir}/${f}") }
+
+            // Get version properties
+            def propsUrl = "https://${env.UDEPLOY_HOST}:${env.UDEPLOY_PORT}/cli/version/versionProperties"
+            def propsOutput = sh(
+                script: """
+                    curl -k -u ${UDEPLOY_USER}:${UDEPLOY_PASS} \
+                        --request GET \
+                        "${propsUrl}?component=${compName}&version=${version}" \
+                        --silent
+                """,
+                returnStdout: true
+            ).trim()
+
+            def propMap = [:]
+            try {
+                def propsJson = readJSON text: propsOutput
+                propMap = propsJson.collectEntries { [(it.name): it.value] }
+            } catch (e) {
+                echo "⚠️ Failed to parse properties for ${compName} ${version}"
+            }
+
+            // Validate that the props correctly point to available files
+            def mappingValidation = [
+                'ManifestPROD_Es1': fileChecks['manifest-es1.yml'] && propMap['ManifestPROD_Es1'] == 'manifest-es1.yml',
+                'ManifestPROD_Es2': fileChecks['manifest-es2.yml'] && propMap['ManifestPROD_Es2'] == 'manifest-es2.yml',
+                'mManifestPROD_Ws2': fileChecks['manifest-ws2.yml'] && propMap['mManifestPROD_Ws2'] == 'manifest-ws2.yml'
+            ]
+
+            results << [
+                component: compName,
+                version: version,
+                files: fileChecks,
+                props: propMap,
+                mapping: mappingValidation
+            ]
+        }
+    }
+
+    // Generate Console Report
+    echo "================ COMPONENT VALIDATION REPORT ================"
+    results.each { res ->
+        echo "\n---------------------------------------------------"
+        echo "Component: ${res.component}"
+        echo "Version: ${res.version}"
+
+        if (res.error) {
+            echo "❌ Error: ${res.error}"
+            return
+        }
+
+        res.files.each { fname, exists ->
+            echo "${fname}: ${exists ? '✅ Available' : '❌ Not Found'}"
+        }
+
+        echo "Version Properties:"
+        ['ManifestPROD_Es1', 'ManifestPROD_Es2', 'mManifestPROD_Ws2'].each { key ->
+            def value = res.props[key] ?: 'Not Set'
+            def match = res.mapping[key] ? '✅ Match' : '❌ Mismatch or Missing'
+            echo " - ${key}: ${value} --> ${match}"
+        }
+    }
+
+    // Create HTML Report
+    def html = """
+    <html><head><title>uDeploy Artifact Validation Report</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        h2 { color: #2e6c80; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+    </style></head><body>
+    <h2>uDeploy Artifact Validation Report</h2>
+    <table>
+        <tr>
+            <th>Component</th>
+            <th>Version</th>
+            <th>manifest-es1.yml</th>
+            <th>manifest-es2.yml</th>
+            <th>manifest-ws2.yml</th>
+            <th>ManifestPROD_Es1</th>
+            <th>ManifestPROD_Es2</th>
+            <th>mManifestPROD_Ws2</th>
+        </tr>
+    """
+
+    results.each { r ->
+        html += "<tr><td>${r.component}</td><td>${r.version}</td>"
+
+        ["manifest-es1.yml", "manifest-es2.yml", "manifest-ws2.yml"].each {
+            html += "<td class='${r.files[it] ? 'pass' : 'fail'}'>${r.files[it] ? 'Available' : 'Missing'}</td>"
+        }
+
+        ['ManifestPROD_Es1', 'ManifestPROD_Es2', 'mManifestPROD_Ws2'].each {
+            def val = r.props[it] ?: 'Not Set'
+            def className = r.mapping[it] ? 'pass' : 'fail'
+            html += "<td class='${className}'>${val}</td>"
+        }
+
+        html += "</tr>"
+    }
+
+    html += "</table></body></html>"
+
+    writeFile file: 'report.html', text: html
+    archiveArtifacts artifacts: 'report.html', fingerprint: true
+}
