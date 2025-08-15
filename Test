@@ -1,1 +1,25 @@
 Status eq 'Approved' and StartDate le '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}' and EndDate ge '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}'
+
+**Today's Leaves - @{formatDateTime(utcNow(), 'MMMM dd, yyyy')}**
+
+@{if(equals(length(body('Get_items')?['value']), 0), 
+'**Great news! Everyone is in the office today!**', 
+concat('**Associates on Leave Today:**
+', 
+join(
+  select(body('Get_items')?['value'], 
+    concat('• ', item()?['Employee']?['DisplayName'], ' - ', item()?['LeaveType'], 
+      if(equals(item()?['StartDate'], item()?['EndDate']), 
+        '', 
+        concat(' (', formatDateTime(item()?['StartDate'], 'MM/dd'), ' - ', formatDateTime(item()?['EndDate'], 'MM/dd'), ')')
+      )
+    )
+  ), 
+  '
+'
+), 
+'
+
+**Total: ', string(length(body('Get_items')?['value'])), ' associate(s) on leave**'))}
+
+*Last updated: @{formatDateTime(utcNow(), 'hh:mm tt')}*
