@@ -1,15 +1,24 @@
 Status eq 'Approved' and StartDate le '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}' and EndDate ge '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}'
 
-**Today's Leaves - @{formatDateTime(utcNow(), 'MMMM dd, yyyy')}**
+Today's Leaves - @{formatDateTime(utcNow(), 'MMMM dd, yyyy')}
 
-@{if(equals(length(body('Get_items')?['value']), 0), 
-'**Great news! Everyone is in the office today!**', 
+@{if(equals(length(body('List_rows_present_in_a_table')?['value']), 0), 
+'✅ **Great news! Everyone is in the office today!**', 
 concat('**Associates on Leave Today:**
 ', 
 join(
-  select(body('Get_items')?['value'], 
-    concat('• ', item()?['Employee']?['DisplayName'], ' - ', item()?['LeaveType'], 
-      if(equals(item()?['StartDate'], item()?['EndDate']), 
+  select(
+    where(body('List_rows_present_in_a_table')?['value'], 
+      and(
+        equals(item()?['Status'], 'Approved'),
+        and(
+          lessOrEquals(formatDateTime(item()?['StartDate'], 'yyyy-MM-dd'), formatDateTime(utcNow(), 'yyyy-MM-dd')),
+          greaterOrEquals(formatDateTime(item()?['EndDate'], 'yyyy-MM-dd'), formatDateTime(utcNow(), 'yyyy-MM-dd'))
+        )
+      )
+    ),
+    concat('• ', item()?['Employee'], ' - ', item()?['LeaveType'], 
+      if(equals(formatDateTime(item()?['StartDate'], 'yyyy-MM-dd'), formatDateTime(item()?['EndDate'], 'yyyy-MM-dd')), 
         '', 
         concat(' (', formatDateTime(item()?['StartDate'], 'MM/dd'), ' - ', formatDateTime(item()?['EndDate'], 'MM/dd'), ')')
       )
@@ -20,6 +29,14 @@ join(
 ), 
 '
 
-**Total: ', string(length(body('Get_items')?['value'])), ' associate(s) on leave**'))}
+**Total: ', string(length(where(body('List_rows_present_in_a_table')?['value'], 
+  and(
+    equals(item()?['Status'], 'Approved'),
+    and(
+      lessOrEquals(formatDateTime(item()?['StartDate'], 'yyyy-MM-dd'), formatDateTime(utcNow(), 'yyyy-MM-dd')),
+      greaterOrEquals(formatDateTime(item()?['EndDate'], 'yyyy-MM-dd'), formatDateTime(utcNow(), 'yyyy-MM-dd'))
+    )
+  )
+))), ' associate(s) on leave**'))}
 
 *Last updated: @{formatDateTime(utcNow(), 'hh:mm tt')}*
