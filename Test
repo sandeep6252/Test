@@ -1,0 +1,1 @@
+Status eq 'Approved' and StartDate le '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}' and EndDate ge '@{formatDateTime(utcNow(), 'yyyy-MM-dd')}'
