@@ -1,0 +1,580 @@
+Below is a well-articulated, design-driven, solution-oriented document written from the perspective of a Senior DevOps Engineer, with a conversational and practitioner-friendly tone.
+Feel free to ask for a diagram, PDF-formatted text, or deeper platform integration examples.
+________________________________________
+CloudBees Feature Management – Design, Architecture & CI/CD Integration Guide
+Author: Senior DevOps Engineer
+________________________________________
+1. Executive Summary
+Modern software teams want to deploy frequently without risking stability. CloudBees Feature Management (formerly Rollout) gives us granular control over features in production, separating deployment from release. This lets us ship code safely, experiment, reduce blast radius, and empower product teams.
+In this document, I’ll walk you through:
+•	How CloudBees Feature Management works internally
+•	Real-time use cases (production-ready scenarios)
+•	Design considerations and architecture
+•	How DevOps teams can integrate it directly into CI/CD pipelines
+•	Practical examples for pipelines (Jenkins, GitHub Actions, GitLab)
+•	Best practices for organizations adopting feature flags
+________________________________________
+2. What CloudBees Feature Management Is
+CloudBees Feature Management (CBFM) is a feature flag platform that provides:
+✔ Dynamic feature toggles (turn features on/off without redeploying)
+✔ Progressive delivery tools (gradual rollouts, dark launches, canary releases)
+✔ Real-time analytics (flag evaluations, errors, performance impact)
+✔ Targeting rules (specific users, segments, or environments)
+✔ Configuration-as-Code support
+✔ Integration with CI/CD pipelines
+In simple DevOps language: CBFM gives you a remote control for your application features.
+________________________________________
+3. High-Level Architecture (How It Works)
+Here’s the conceptual picture:
+ ┌────────────────┐
+ │ CloudBees FM   │  <-- Cloud platform for feature flags
+ │ Management UI  │
+ └───────┬────────┘
+         │ REST API / SDK Sync
+ ┌───────▼──────────────────────┐
+ │ Client SDK (Java, Node, etc) │   <-- Evaluates flags in code
+ └───────────────┬──────────────┘
+                 │ 
+         Real-Time Flag Updates
+                 │
+ ┌───────────────▼──────────────┐
+ │   Running Application         │  <-- Feature on/off without redeploy
+ │ (Prod, Staging, Dev)          │
+ └───────────────────────────────┘
+Key Architecture Components
+Component	Description
+Feature Flag Management Console	UI to create, modify, and target feature rules
+Client SDKs	Evaluate feature flags locally with near-zero latency
+Rules Engine	Cloud-based rule evaluation + target segmentation
+Streaming Updates	Apps receive flag updates instantly without restarts
+Analytics Layer	Captures impressions, events, and experiment results
+Evaluation Types
+CBFM uses a hybrid evaluation model:
+•	Local evaluation via SDK (fast & reliable)
+•	Remote updates via real-time streaming (no redeploys needed)
+This ensures zero downtime and sub-millisecond latency flag checks.
+________________________________________
+4. Real-Time Use Cases (Field-Proven)
+Here are the scenarios I’ve seen most organizations implement.
+________________________________________
+4.1. Progressive Rollouts (Canary Releases)
+You deploy a new API version but release it only to 5% of traffic, then gradually increase.
+Rollout Rule:
+  Percentage: 5% → 25% → 50% → 100%
+Useful when you're unsure about:
+•	performance impact
+•	user experience
+•	error spikes
+________________________________________
+4.2. Operational Toggles (Kill Switches)
+E.g., disable a recommendation engine if it starts consuming excessive CPU.
+You can literally flip a switch in the dashboard:
+MachineLearningRecommendationEngine: OFF
+________________________________________
+4.3. Experimentation / A/B Testing
+You can split traffic based on randomization or user attributes:
+•	50% see old checkout flow
+•	50% see new flow
+Product and data teams get metrics instantly.
+________________________________________
+4.4. Dark Launches
+Ship a feature inactive in production, test it only with internal employees or selected users.
+________________________________________
+4.5. Environment Configuration via Flags
+Instead of storing app configs in code or environment variables, store them as feature flags:
+•	timeout values
+•	API endpoints
+•	toggles for expensive operations
+________________________________________
+4.6. Hotfix Workarounds Without Deploying
+Critical production issues can be mitigated instantly.
+________________________________________
+5. Where This Fits in DevOps / CI-CD Pipelines
+Let's discuss what every DevOps engineer wonders:
+How do we plug this into the pipeline?
+Here’s the lifecycle:
+[Developer] 
+     ↓ (commit)
+[CI Build & Unit Tests]
+     ↓ 
+[Deploy to Staging]
+     ↓
+[Enable Feature Flag for QA Only]
+     ↓
+[Manual / Automated Tests]
+     ↓
+[Promote to Prod]
+     ↓
+[Enable Feature for 1%-100% of users progressively]
+CloudBees integrates here:
+✔ Turn on flags during CI
+✔ Auto-create flags with configuration-as-code
+✔ Automatically progressively release after deployment
+✔ Disable flags if monitoring alerts trigger
+________________________________________
+6. Integrating CloudBees Feature Management into CI/CD
+Below are practical, production-style examples.
+________________________________________
+6.1 Jenkins Integration Example
+Use Case:
+After a successful deploy, rollout the feature to 10%.
+Jenkinsfile
+stage('Enable Feature Flag') {
+  steps {
+    sh """
+      curl -X PATCH \
+      -H "Authorization: Bearer $CLOUDBEES_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"rolloutPercentage": 10}' \
+      https://api.cloudbees.com/flags/my-app/user-onboarding
+    """
+  }
+}
+________________________________________
+6.2 GitHub Actions Integration Example
+jobs:
+  rollout:
+    steps:
+      - name: Gradually Enable Feature
+        run: |
+          curl -X PATCH \
+          -H "Authorization: Bearer ${{ secrets.CLOUDBEES_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"rolloutPercentage": 25}' \
+          https://api.cloudbees.com/flags/my-app/searchV2
+________________________________________
+6.3 GitLab CI Example
+enable_flag:
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -H "Authorization: Bearer $CLOUDBEES_API_KEY"
+      -H "Content-Type: application/json"
+      -d '{"enabled": true}'
+      https://api.cloudbees.com/flags/my-app/expFeature
+________________________________________
+7. Implementation Blueprint (Step-by-Step)
+Below is a recommended design for your engineering org.
+________________________________________
+Step 1. Add Feature Flag SDK to Application
+Example (Node.js):
+import { Rox } from 'rox-node';
+
+Rox.setup('YOUR_ENV_KEY').then(() => {
+  if (Rox.flags.newSearch.isEnabled()) {
+    runNewSearch();
+  } else {
+    runOldSearch();
+  }
+});
+________________________________________
+Step 2. Define Flags in Code & In CloudBees UI
+Example flags:
+•	newSearchFlow
+•	useCacheV2
+•	enableMLRecommendations
+•	killSwitch_apiThrottle
+________________________________________
+Step 3. Add Flags to Config-as-Code Repo
+Example YAML (CloudBees Cfg-as-Code):
+flags:
+  newSearchFlow:
+    description: "New optimized search experience"
+    default: false
+    tags: [search, beta]
+Pipeline automatically syncs this to CloudBees.
+________________________________________
+Step 4. Manage Flags in CI/CD
+During deployment you either:
+•	turn on flags
+•	create new flags
+•	increase rollout percentage
+•	remove legacy flags
+________________________________________
+Step 5. Rollout & Monitor
+This includes monitoring metrics connected through:
+•	Datadog
+•	New Relic
+•	Prometheus
+•	CloudWatch
+If errors spike → pipeline disables flag automatically.
+________________________________________
+8. Best Practices (From Real DevOps Teams)
+✔ Treat flags like code
+Use version control + approvals.
+✔ Clean up stale flags automatically
+Use expiration metadata.
+✔ Do not use flags for critical security logic
+Flags should never gate security controls like authz.
+✔ Use naming conventions
+E.g.,
+exp_, beta_, kill_, ops_.
+✔ Integrate with Observability
+“Feature X triggered latency spike” is priceless.
+✔ Combine with progressive delivery pipelines
+________________________________________
+9. Summary (Conversation Style)
+If we think of modern software delivery as a highway, feature flags are the lane dividers letting us control how fast we go, when we switch lanes, and which cars are allowed where.
+CloudBees Feature Management works because it gives developers the ability to move fast, but with guardrails. As a DevOps engineer, integrating it into CI/CD means you gain:
+•	safer releases
+•	faster rollouts
+•	better observability
+•	instant rollback
+•	happier developers
+•	fewer 2 AM production incidents
+________________________________________
+If you'd like, I can also provide:
+✅ System architecture diagram (ASCII or graphical)
+✅ A full enterprise rollout plan
+✅ CI/CD templates for Jenkins, GitHub, GitLab
+✅ SDK code examples for Java, Go, Python, Node
+✅ Presentation slides format
+Just tell me what you want next.
+
+
+
+CloudBees Feature Management — Integration with Self-Service Deployment
+Scope: explain how CloudBees Feature Management (CFM) can be used with our Self-Service deployment process (Bitbucket → CloudBees CI → CloudBees CD → uDeploy → Prod), including required Jira/ServiceNow form changes, pipeline changes, approval gating, rollback, monitoring and runbooks.
+________________________________________
+1 — Summary / Goal
+Add feature-flag control to the existing self-service deployment so teams can:
+•	Choose which features to enable (and rollout strategy) from the Jira release form.
+•	Have CloudBees CD apply feature changes (enable/disable or staged rollouts) as part of the release pipeline before/after the uDeploy deployment step.
+•	Keep all approvals, audit trail, and change management in ServiceNow/CAB.
+•	Support safe rollouts (percentage targeting, canary, attribute targeting) and instant rollback without new artifact deployments.
+________________________________________
+2 — High level architecture / flow (with CFM)
+1.	Developer creates Jira Main Release story + subtasks (one subtask per microservice) — existing.
+2.	Subtask includes: microservice name, uDeploy artifact version, desired Feature choices (new fields — see Section 4).
+3.	When release story is closed, Jira hook triggers CloudBees CI — existing flow. Jira payload now includes feature selection(s).
+4.	CloudBees CI calls CloudBees CD Create Release pipeline and passes the Jira ID + selected features + foundations to deploy.
+5.	Create Release pipeline creates per-microservice release pipelines (existing). It also creates ServiceNow change tickets (existing).
+6.	After ServiceNow CAB approval, developer uses the ServiceNow UI to pick foundations to deploy (existing), the selection triggers CloudBees CD.
+7.	At the point CloudBees CD is ready to run the uDeploy application process, the CD pipeline performs the configured CFM operations:
+o	e.g. set feature flag(s) to desired state for the chosen foundation (or orchestrate a % rollout), or update target segments.
+o	After feature operations succeed, CD triggers uDeploy deploy. Optionally do feature toggles after deploy for dark-launch or immediate activation.
+8.	Post-deployment: CD runs smoke tests and verifies metrics and feature evaluation via CFM SDKs/metrics. If failure, rollback using feature toggle (instant) and/or uDeploy rollback (artifact rollback).
+________________________________________
+3 — Integration patterns (choose one or mix)
+A. Feature toggle pre-deploy (recommended for flags that affect deployment behaviour)
+•	CD sets the flags (e.g. enabling a configuration) before uDeploy runs.
+•	Use when enabling a feature requires application to boot with new config.
+B. Feature toggle post-deploy (recommended for dark launches / progressive rollout)
+•	Deploy artifact first (canary/uptime), then toggle feature on in stages (0% → 100%).
+•	Good for high-risk features that must be controlled independently.
+C. Feature toggle gradual percentage rollout
+•	CD triggers CFM to set percentage (e.g. ramp from 5% → 25% → 100%) with pauses between steps and health checks.
+D. Metadata-only toggles (no app change)
+•	For features that do not require code changes, use toggle only and avoid redeploy.
+________________________________________
+4 — Jira changes (form & fields)
+Add these fields to the Jira release/subtask form (subtask per microservice):
+•	Feature selection (multi-select) — list of feature keys available for that microservice (displayed as serviceName.featureKey).
+•	Feature action — Enable / Disable / Toggle / Rollout (percentage) (or allow default action per feature).
+•	Rollout percentage — integer (0-100). Used if action == Rollout.
+•	Target segment — free text or a picklist (e.g., all, beta_users, foundationX_users).
+•	Apply timing — Before Deploy / After Deploy / During Deploy (default: After Deploy).
+•	Validation checks — optional checkboxes: run smoke tests, run canary tests, run integration tests.
+•	Owner / Contact — person responsible for the toggle.
+Notes
+•	Make feature list queryable — ideally the Jira form fetches the available features through the CFM API (or a cached list) filtered by microservice so developers only see relevant flags.
+•	Validate chosen feature key exists (CI job can validate as first step).
+________________________________________
+5 — ServiceNow changes
+•	ServiceNow change form remains the gate for changes to production.
+•	Add a summary of requested CFM operations (feature keys and requested rollouts) to the change ticket.
+•	The ServiceNow approval should explicitly include approval for Feature Management operations.
+•	Keep a clickable preview in ServiceNow (optional) showing the exact flags and target environments.
+________________________________________
+6 — CloudBees CI / CloudBees CD pipeline changes (detailed)
+Create Release pipeline (CloudBees CD):
+•	Accepts Jira payload that includes features chosen and rollout parameters.
+•	For each subtask, create a release pipeline and attach the selected feature instructions as pipeline variables.
+Per-microservice release pipeline (CloudBees CD):
+Suggested sequence (pseudosteps):
+1.	Validate inputs:
+o	Confirm uDeploy artifact version exists in Nexus/uDeploy (existing).
+o	Confirm feature keys exist in CFM (call CFM read API).
+2.	If Apply timing = Before Deploy, call CFM: apply-feature-change.
+3.	Trigger uDeploy application process to deploy artifact to selected foundation(s).
+4.	If Apply timing = After Deploy, call CFM: apply-feature-change.
+5.	Run smoke/canary tests (CloudBees CI or remote test jobs).
+6.	Monitor metrics for configured time/window; if health OK, continue.
+7.	If failure detected, run rollback:
+o	Try CFM: revert-feature-change (instant), AND/OR
+o	Trigger uDeploy rollback to previous artifact.
+8.	Mark Jira/ServiceNow change as completed; update audit.
+Implementation notes
+•	Implement apply-feature-change as a generic pipeline step that calls CloudBees Feature Management REST API (or SDK) using a service account.
+•	Pipeline should log all requests/responses for audit.
+•	Use retries and a backoff strategy for transient failures.
+•	Use parameterized steps so teams can choose pre or post deploy toggles.
+________________________________________
+7 — Example API / Payload (pseudocode)
+Use your CFM API/SDK. Replace <CFM-URL>, <API-TOKEN>, <FEATURE_KEY>, <ENV> with real values.
+Enable feature (100%)
+curl -X POST "<CFM-URL>/api/flags/<FEATURE_KEY>/environments/<ENV>/toggle" \
+  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "enable",
+    "rollout": {
+       "type": "percentage",
+       "value": 100
+    },
+    "comment": "Enabled by CloudBees CD for Jira <JIRA_ID>"
+  }'
+Set percent rollout
+curl -X POST "<CFM-URL>/api/flags/<FEATURE_KEY>/environments/<ENV>/rollout" \
+  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "percentage": 10,
+    "comment": "Canary stage 1 - Jira <JIRA_ID>"
+  }'
+Read feature state
+curl -X GET "<CFM-URL>/api/flags/<FEATURE_KEY>/environments/<ENV>" \
+  -H "Authorization: Bearer <API_TOKEN>"
+(If CloudBees Feature Management provides SDKs — prefer SDKs for typed operations; otherwise use REST.)
+________________________________________
+8 — Pipeline pseudocode (CloudBees CD DSL style)
+stage("Apply Feature Flags (if Before Deploy)") {
+  for each feature in jira.features:
+    if feature.applyTiming == "Before Deploy":
+      cfm.apply(feature.key, feature.action, feature.percentage, env)
+}
+
+stage("uDeploy Deploy") {
+  udeploy.trigger(application, process, version, foundation)
+}
+
+stage("Apply Feature Flags (if After Deploy)") {
+  for each feature in jira.features:
+    if feature.applyTiming == "After Deploy":
+      cfm.apply(...)
+}
+
+stage("Validation & Monitoring") {
+  runSmokeTests()
+  if !healthOK:
+    runRollback()
+}
+________________________________________
+9 — Rollback strategies
+•	Fast rollback (recommended): use CFM to immediately disable the feature or reduce percentage to 0%. This gives immediate mitigation without redeploy.
+•	Artifact rollback: if toggle cannot address the issue, call uDeploy rollback to prior artifact version.
+•	Combined: toggle off → monitor → rollback artifact if needed.
+Ensure all rollbacks are recorded in ServiceNow and Jira.
+________________________________________
+10 — Testing & Verification
+•	Unit tests & integration tests for feature evaluation code (app) — app must respect CFM SDK semantics (cache, fallback, timeouts).
+•	Pipeline tests: test the CD steps that call CFM in a non-prod foundation (dev/staging).
+•	Canary smoke tests: after a partial rollout, run functional tests against the canary cohort.
+•	End-to-end validation: verify both that feature state changed in CFM and that clients evaluate it properly (e.g., REST endpoint or app logs show the feature is active).
+________________________________________
+11 — Observability & Audit
+•	Audit logs: log every CFM API call with timestamp, user/system actor, Jira ID, ServiceNow change ID.
+•	Metrics: track success/failure rates for features (if CFM supports metric integrations) and business KPIs.
+•	Alerts: trigger alerting on error rates during a rollout; integrate with Splunk/NewRelic/Cloudwatch.
+•	Dashboard: build a dashboard listing active rollouts, owners, and percentage.
+________________________________________
+12 — Security & RBAC
+•	Use a CFM service account with minimal required permissions to change flags.
+•	Have RBAC in CFM: only SRE/Release automation account can make automated toggles; developer UI only requests changes via Jira.
+•	Keep API token in CloudBees CD credentials store (encrypted).
+•	Approvals in ServiceNow/CAB remain mandatory for production.
+________________________________________
+13 — Roles & responsibilities
+•	Developer / App team: Declare feature keys in Jira, provide rollouts and tests, own rollbacks for their feature.
+•	Release Manager: Ensure Jira fields are correct and change ticket includes feature operations.
+•	SRE / Platform: Maintain CFM infra, ensure RBAC, maintain pipeline steps and runbooks.
+•	CloudBees CD owners: implement and maintain pipeline steps that call CFM.
+•	ServiceNow / CAB: Approve feature changes to Prod.
+________________________________________
+14 — Runbook (short)
+If post-deploy errors after enabling a feature:
+1.	Immediately set feature percentage to 0% or disable the feature via CFM.
+2.	Monitor for error rate drops (5-10 minutes).
+3.	If stable, investigate root cause; optionally re-enable at lower % once fixed.
+4.	If errors persist, perform uDeploy rollback to previous artifact and mark incident in Jira/ServiceNow.
+5.	Document the sequence and create a post-mortem.
+________________________________________
+15 — Implementation checklist (minimum viable)
+•	Add Jira fields: Feature selection, action, rollout %, timing.
+•	Provide a maintained list of feature keys (CFM) per microservice (make them discoverable in Jira form).
+•	Create CloudBees CD generic step cfm.apply that:
+o	validates feature key,
+o	performs toggle/rollout,
+o	returns status for pipeline decisioning.
+•	Add cfm.read validation step in pipeline.
+•	Store CFM API token securely in CloudBees CD credential store.
+•	Update Create Release pipeline to pass feature info to per-microservice pipelines.
+•	Update ServiceNow change template to include CFM operations summary and approval checkbox.
+•	Implement smoke test stage and health checks in release pipelines.
+•	Document runbooks and train release owners.
+________________________________________
+16 — Example concrete scenario (end-to-end)
+•	Developer selects feature payment.v2_checkout on Jira subtask for orders-service, sets Apply timing = After Deploy, Rollout = 10%, Target = foundation:prod-west.
+•	Jira closed → CloudBees CI triggers Create Release → cloudbees CD creates release pipeline and writes feature instructions.
+•	CAB approves ServiceNow change.
+•	CD deploys orders-service version 1.4.2 to prod-west via uDeploy.
+•	CD calls CFM: set payment.v2_checkout to 10% in prod-west.
+•	CD runs canary tests against 10% users. Metrics OK → CD sets to 25% → tests OK → sets to 100%.
+•	If at any stage metrics degrade, CD sets payment.v2_checkout to 0% instantly and triggers rollback if necessary.
+________________________________________
+17 — FAQs & practical tips
+•	Q: What if a feature key is missing in CFM?
+A: The pipeline should fail fast and notify the release owner. Add a pre-deploy validation that queries CFM for existence of the flag.
+•	Q: Should toggles be done by the developer or automatically?
+A: Developer chooses in Jira; CloudBees CD performs the action automatically once ServiceNow approval is done. This preserves auditability.
+•	Q: How do we avoid feature name collisions?
+A: Use a naming convention serviceName.featureName and a central registry (CFM UI or a repo).
+•	Q: Can we keep a list of allowed rollouts per feature?
+A: Yes — store permissible rollout policies in a config (e.g., maximum % allowed without SRE approval).
+________________________________________
+18 — Next steps & rollout plan
+1.	Prototype pipeline integration in a dev foundation: add cfm.apply step and validate with a test feature.
+2.	Update Jira form to include feature picklist (start with a few teams).
+3.	Run a pilot release with one microservice and 10% post-deploy toggle.
+4.	Iterate on monitoring and rollback processes.
+5.	Expand to all teams and harden RBAC and audit trails.
+________________________________________
+19 — Deliverables I can produce for you (I can create these now in this chat)
+•	A copy-ready Confluence/Markdown document of the above sections.
+•	Example CloudBees CD pipeline snippet (more concrete code if you want—Groovy DSL or YAML depending on your pipeline style).
+•	A ready curl/SDK script template for apply-feature-change and read-feature with placeholders.
+•	A Jira form JSON schema / sample configuration for populating custom fields.
+•	A ServiceNow change template sample.
+Tell me which of the above deliverables you want me to actually generate right now (e.g., full Confluence markdown, pipeline script in Groovy, or the curl script templates) and I’ll produce it immediately.
+ 
+
+CloudBees Feature Management (CFM) – Integration with Self-Service Deployment Process
+Document Version
+•	Author: Sandeep G
+•	Last Updated: November 2025
+•	Scope: Technical & functional documentation for integrating CloudBees Feature Management into the current Self-Service Deployment (SSD) model used across environments and production.
+________________________________________
+1. Introduction
+This document explains:
+1.	How CloudBees Feature Management (CFM) works.
+2.	How CFM is integrated into our existing end-to-end Self-Service Deployment model.
+3.	Required changes in Jira, ServiceNow, CloudBees CI/CD pipelines.
+4.	DevOps workflow enhancements, approval flows, rollout strategies, rollback, and audit.
+5.	End-to-end example scenario.
+This document is intended for:
+•	Developers
+•	DevOps/Platform Engineers
+•	SREs
+•	CloudBees CD/CI Operators
+•	Release Managers
+•	CAB/Change Management Teams
+________________________________________
+2. Current Self-Service Deployment Overview (Existing Process)
+This section summarizes our existing deployment model for Production.
+2.1 Tools Used
+•	Bitbucket – Source code & versioning
+•	CloudBees CI – CI automation
+•	CloudBees CD – Release orchestration
+•	uDeploy – Artifact deployment to foundations
+•	Jira – Release planning
+•	ServiceNow – Change Management & Approvals
+________________________________________
+3. Current Deployment Flow (Before Feature Management)
+1.	Developer creates a Jira Main Release Story.
+o	Includes 1 subtask per microservice.
+o	Each subtask includes:
+	Microservice name
+	uDeploy artifact version
+	Start & End dates
+	Deployment details
+2.	Developer closes all subtasks → closes Main Release story.
+3.	Jira Hook triggers a CloudBees CI job
+o	CI job passes Jira Release ID → CloudBees CD Create Release Pipeline.
+4.	Create Release Pipeline (CloudBees CD)
+o	Creates one Release pipeline per microservice (per subtask).
+o	Creates two Change Requests in ServiceNow.
+5.	CAB Approval in ServiceNow
+o	ServiceNow form has a Deploy button
+o	Clicking it opens a Foundation List
+o	Developer chooses which foundation to deploy.
+6.	ServiceNow → CloudBees CD → uDeploy
+o	Foundation selection triggers CD → triggers uDeploy Application Process.
+o	Artifact version defined in Jira is always used.
+o	Only versions already promoted to QA/UAT are used.
+This end-to-end automated chain is known internally as Self-Service Deployment (SSD).
+________________________________________
+4. Need for Feature Management Integration
+Developers currently deploy microservices with artifacts, but do not control feature rollout, enablement, or risk mitigation.
+CloudBees Feature Management (CFM) enables:
+•	Feature toggles
+•	Progressive rollouts (percentage rollout)
+•	Foundation-specific toggles
+•	Instant rollback without redeploy
+•	Segmented feature targeting
+Integrating CFM into SSD allows us to manage feature releases and code deployments separately, improving safety and flexibility.
+________________________________________
+5. Proposed End-to-End Flow with Feature Management
+Side-by-side comparison
+Step	Existing	With Feature Management
+Jira Story	Only deployment info	Adds feature choices, rollout %, timing
+CloudBees CI → CD	Sends story data	Sends features + actions
+ServiceNow	Only deploy approval	Approves feature toggles too
+CD Release Pipeline	Deploy only	Feature toggle before/after deploy
+Rollback	Artifact rollback	Feature rollback + artifact rollback
+________________________________________
+6. Jira Enhancements
+We must collaborate with Jira team to add new custom fields:
+6.1 New Jira fields (per Subtask)
+Field Name	Description
+Features to Modify	Multi-select list of features belonging to that microservice
+Feature Action	Enable / Disable / Toggle / Percentage rollout
+Rollout Percentage	e.g., 5, 10, 25, 50, 100
+Target Segment	e.g., all, beta_users, foundation_X_users
+Apply Timing	Before Deploy / After Deploy
+Feature Owner	Contact person for approvals
+6.2 Dynamic Feature Loading
+•	Jira UI can fetch feature keys from CloudBees Feature Management API.
+•	Developer only sees features relevant to their microservice.
+________________________________________
+7. ServiceNow Enhancements
+ServiceNow Change Tickets must include:
+1.	Summary of requested feature actions
+2.	Fields showing:
+o	Feature names
+o	Enable/Disable/Rollout
+o	Percentage
+o	Target segment
+3.	Approval for Feature Changes (CAB must approve)
+The existing Deploy Foundation Selector remains unchanged.
+________________________________________
+8. CloudBees CI / CloudBees CD Enhancements
+We introduce new steps to manage CloudBees Feature Management.
+8.1 Create Release Pipeline Changes
+•	Accept CFM-related parameters from Jira.
+•	Attach feature instructions as variables for each microservice release pipeline.
+________________________________________
+9. CloudBees CD – Per-Microservice Release Pipeline Changes
+New Pipeline Flow
+1.	Validate Jira Inputs
+o	Validate uDeploy artifact version.
+o	Validate feature keys exist in CFM.
+2.	Feature Update (Before Deploy) – Optional
+o	Only if Apply Timing == “Before Deploy”.
+3.	uDeploy Deployment
+o	Deploy microservice version to the selected foundation.
+4.	Feature Update (After Deploy) – Optional
+o	Only if timing == “After Deploy”.
+5.	Testing & Validation
+o	Smoke tests
+o	Canary tests
+o	Load/API checks
+6.	Monitoring Window
+o	Compare metrics with baseline.
+7.	Rollback
+o	Step 1: Disable feature / rollback percentage to 0%.
+o	Step 2: If still failing → uDeploy rollback to previous version.
+________________________________________
+10. CloudBees Feature Management API Integration
+CloudBees CD will call CFM using a service account via API/
+ 
