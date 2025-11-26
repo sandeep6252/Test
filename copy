@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+set -e  # fail fast; do NOT use set -u or pipefail in UDeploy
+
+#############################################
+# PARAMETERS (UDEPLOY INTERPOLATED)
+#############################################
+
+APPID="${p:component/Application Name}"
+CF_CLI="${p:system/CF_CLI}"
+GREEN_APP="${APPID}-green"
+MAX_RETRIES=3
+RETRY_DELAY=2
+
+#############################################
+# VALIDATION
+#############################################
+
+if [[ -z "$APPID" ]]; then
+    echo "ERROR: Application Name (APPID) is empty. Check UDeploy component properties."
+    exit 1
+fi
+
+if [[ -z "$CF_CLI" ]]; then
+    echo "ERROR: CF_CLI path not provided in UDeploy."
+    exit 1
+fi
+
+#############################################
+# SAFE LOGOUT ON EXIT
+#############################################
+logout_cf() {
+    echo "INFO: Logging out from CF..."
+    $CF_CLI cf logout >/dev/null 2>&1 || true
+}
+trap logout_cf EXIT
+
+#############################################
+# CF COMMAND WITH RETRY (UDeploy Safe)
+#############################################
+run_cf_cmd() {
+    cmd="$1"
+
+    for attempt in $(seq 1 $MAX_RETRIES); do
+        output=$(eval "$cmd" 2>&1)
+        rc=$?
+
+        if [[ $rc -eq 0 ]]; then
+            echo "$output"
+            return 0
+        fi
+
+        if echo "$output" | grep -qi "Process not found"; then
+            echo "WARN: '$cmd' → Process not found (attempt $attempt/$MAX_RETRIES). Retrying..."
+            sleep "$RETRY_DELAY"
+        else
+            echo "ERROR: '$cmd' failed: $output"
+            return 1
+        fi
+    done
+
+    echo "ERROR: '$cmd' failed after $MAX_RETRIES attempts."
+    return 1
+}
+
+#############################################
+# LOGIN
+#############################################
+echo "INFO: Logging into Cloud Foundry..."
+run_cf_cmd "$CF_CLI cf login -a \"${p:system/CF_API_OPE_EAST-2}\" -o \"${p:system/PCF_ORG}\" -s \"${p:environment/environment}\" -u \"${p:system/PCF_PROD_USER}\" -p \"${p:system/PCF_PROD_PASS}\""
+
+#############################################
+# CHECK GREEN APP EXISTS
+#############################################
+echo "INFO: Checking for $GREEN_APP..."
+
+apps_output=$(run_cf_cmd "$CF_CLI cf apps")
+
+if echo "$apps_output" | grep -q "$GREEN_APP"; then
+    echo "INFO: Found existing green app: $GREEN_APP"
+    found_app=1
+else
+    echo "INFO: Green app does not exist. Nothing to copy."
+    found_app=0
+fi
+
+#############################################
+# COPY CONFIG IF GREEN APP EXISTS
+#############################################
+if [[ "$found_app" -eq 1 ]]; then
+
+    #########################################
+    # COPY ROUTES
+    #########################################
+    echo "INFO: Copying routes for $GREEN_APP..."
+
+    routes=$(run_cf_cmd "$CF_CLI cf routes")
+    echo "$routes" | grep "$GREEN_APP" | awk '{print $2}' > "${APPID}_list_host.txt"
+    echo "$routes" | grep "$GREEN_APP" | awk '{print $3}' > "${APPID}_list_domain.txt"
+
+    if [[ ! -s "${APPID}_list_host.txt" ]]; then
+        echo "ERROR: No host routes found for $GREEN_APP."
+        exit 1
+    fi
+
+    #########################################
+    # COPY AUTOSCALING CONFIG
+    #########################################
+    echo "INFO: Copying autoscaling settings for $GREEN_APP..."
+
+    autoscaler=$(run_cf_cmd "$CF_CLI cf autoscaling-apps")
+    echo "$autoscaler" | grep "$GREEN_APP" > "${APPID}_list_Autoscaler.txt"
+
+    run_cf_cmd "$CF_CLI cf autoscaling-rules $GREEN_APP" > "${APPID}_list_Autoscaling-Rules.txt"
+
+    if [[ ! -s "${APPID}_list_Autoscaling-Rules.txt" ]]; then
+        echo "ERROR: Could not fetch autoscaling rules for $GREEN_APP."
+        exit 1
+    fi
+
+    echo "INFO: Route + Autoscaling extraction completed."
+fi
+
+echo "INFO: Script execution completed successfully."
+exit 0
