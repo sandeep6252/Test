@@ -1,40 +1,45 @@
-Here is a clean, professional communication you can send to all Application Teams, based fully on the content from your image:
+Here is the improved, fully polished professional communication, rewritten using the updated content you provided in the second image. This is ready to send to all Application Teams:
 
 ⸻
 
-Subject: Important Update: SonarQube Upgrade & Temporary Mitigation Plan
+Subject: SonarQube Upgrade – Important Update & Required Actions for Application Teams
 
 Dear Application Teams,
 
-The DevOps team has successfully completed the upgrade of the SonarQube PROD instance on 3rd August 2025. During our post-upgrade validation, we identified that several existing rules in the quality profiles have been modified as part of the upgrade.
+The DevOps team performed an upgrade of the SonarQube PROD instance on 3rd August 2025. During the post-upgrade validation, we identified that multiple existing rules in the quality profiles had been modified as part of the upgrade. As a result, code that previously passed the quality gate began to fail due to these updated rules.
 
-As a result, code that previously passed the SonarQube quality gate is now failing due to these updated rules. We understand that teams will require time to review and remediate these newly reported violations. To ensure a smooth transition without impacting ongoing development and deployments, we are introducing a phased mitigation plan.
+To avoid disruption to ongoing development and deployments, the DevOps team has temporarily rolled back the SonarQube version to the previous stable release. However, to ensure a smooth and controlled adoption of the updated rules, we are implementing a phased mitigation plan that will allow development teams sufficient time to address new rule violations.
 
 ⸻
 
 Mitigation Plan
-	•	A new Drop-Down option will be introduced in all DEV pipelines, allowing teams to choose between running SonarQube scans on the SONARQUBE-DEV instance or the SONARQUBE-LAB instance.
-	•	The SONARQUBE-LAB instance has already been upgraded to the latest version and will reflect all modified rules. This allows teams to proactively view and address rule violations before the changes are enforced in PROD.
-	•	Currently, all DEV pipelines run SonarQube scans using the updated rule set. The new Drop-Down option gives teams flexibility to validate code against the upgraded LAB instance while continuing development activities smoothly.
-	•	This dual-scan option will remain available for three months, giving teams sufficient time to fix violations introduced by rule modifications before the SonarQube PROD upgrade is finalized across all environments.
-	•	By 10th December, all DEV pipelines managed by the DevOps team will include a new parameter: RUN_SONAR_ON (options: SONARQUBE-DEV or SONARQUBE-LAB).
+	•	A new Drop-Down option will be introduced in all DEV pipelines, allowing developers to run SonarQube scans against either:
+	•	SONARQUBE-DEV instance, or
+	•	SONARQUBE-LAB instance.
+	•	The SONARQUBE-LAB instance has been upgraded to the latest version. It will perform full code scans using the modified rules, giving teams visibility into new rule violations.
+	•	Currently, all DEV pipelines run SonarQube scans using the existing PROD-compatible rules.
+The new Drop-Down option will allow teams to voluntarily switch scans to the LAB instance and begin addressing updated rule violations ahead of the final rollout.
+	•	This option will be available for three months, giving all teams adequate time to review and remediate issues before the SonarQube upgrade is pushed again to the PROD instance.
+	•	By 10th December, all DEV pipelines managed by the DevOps team will include a new parameter:
+RUN_SONAR_ON
+(Options: SONARQUBE-DEV / SONARQUBE-LAB)
 
 ⸻
 
-Action Required from Application Teams
-	•	Please begin validating your code against the SONARQUBE-LAB option once the new parameter is available.
-	•	Start addressing any new rule violations detected in the LAB instance.
-	•	Ensure all identified issues are remediated within the three-month transition window.
+Action Required
+	•	Once the new parameter becomes available, teams should begin scanning their code against SONARQUBE-LAB to understand the impact of the upcoming rule changes.
+	•	Address any identified rule violations during the three-month transition window.
+	•	Ensure your code remains compliant when the upgraded rules are finally enforced in PROD.
 
 ⸻
 
-If you have any concerns or require support during this period, please reach out to the DevOps team.
+If your team needs assistance or has concerns regarding this transition, please reach out to the DevOps team.
 
-Thank you for your cooperation.
+Thank you for your cooperation and support.
 
 Regards,
 DevOps Team
 
 ⸻
 
-If you want, I can also prepare a PDF version, email template, or announcement banner message.
+If you want, I can also convert this into a PDF, email template, or Confluence-ready format.
