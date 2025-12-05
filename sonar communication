@@ -1,0 +1,40 @@
+Here is a clean, professional communication you can send to all Application Teams, based fully on the content from your image:
+
+⸻
+
+Subject: Important Update: SonarQube Upgrade & Temporary Mitigation Plan
+
+Dear Application Teams,
+
+The DevOps team has successfully completed the upgrade of the SonarQube PROD instance on 3rd August 2025. During our post-upgrade validation, we identified that several existing rules in the quality profiles have been modified as part of the upgrade.
+
+As a result, code that previously passed the SonarQube quality gate is now failing due to these updated rules. We understand that teams will require time to review and remediate these newly reported violations. To ensure a smooth transition without impacting ongoing development and deployments, we are introducing a phased mitigation plan.
+
+⸻
+
+Mitigation Plan
+	•	A new Drop-Down option will be introduced in all DEV pipelines, allowing teams to choose between running SonarQube scans on the SONARQUBE-DEV instance or the SONARQUBE-LAB instance.
+	•	The SONARQUBE-LAB instance has already been upgraded to the latest version and will reflect all modified rules. This allows teams to proactively view and address rule violations before the changes are enforced in PROD.
+	•	Currently, all DEV pipelines run SonarQube scans using the updated rule set. The new Drop-Down option gives teams flexibility to validate code against the upgraded LAB instance while continuing development activities smoothly.
+	•	This dual-scan option will remain available for three months, giving teams sufficient time to fix violations introduced by rule modifications before the SonarQube PROD upgrade is finalized across all environments.
+	•	By 10th December, all DEV pipelines managed by the DevOps team will include a new parameter: RUN_SONAR_ON (options: SONARQUBE-DEV or SONARQUBE-LAB).
+
+⸻
+
+Action Required from Application Teams
+	•	Please begin validating your code against the SONARQUBE-LAB option once the new parameter is available.
+	•	Start addressing any new rule violations detected in the LAB instance.
+	•	Ensure all identified issues are remediated within the three-month transition window.
+
+⸻
+
+If you have any concerns or require support during this period, please reach out to the DevOps team.
+
+Thank you for your cooperation.
+
+Regards,
+DevOps Team
+
+⸻
+
+If you want, I can also prepare a PDF version, email template, or announcement banner message.
